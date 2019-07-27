@@ -1,4 +1,5 @@
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -43,22 +44,28 @@ def _list_diff(path, src, comp):
     length = len_src if len_src >= len_comp else len_comp
     for index in range(length):
         if index < len_src and index < len_comp:
-            d.append(diff(src[index], comp[index], path=path+'['+index+']'))
+            d.extend(diff(src[index], comp[index], path=path+'['+str(index)+']'))
         elif index >= len_src and index < len_comp:
-            d.append(_added(path+'['+index+']', comp[index]))
+            d.append(_added(path+'['+str(index)+']', comp[index]))
         elif index < len_src and index >= len_comp:
-            d.append(_removed(path+'['+index+']', src[index]))
+            d.append(_removed(path+'['+str(index)+']', src[index]))
         else:
             raise Exception('This should not happen')
     return d
     
+def show(src):
+    print(json.dumps(src, indent=4))
         
 
 def diff(src, comp, **kw):
     path = kw.get('path', '')
     if src != None and comp == None:
+        if path == '':
+            return [_removed(path, src)]
         return [_updated(path, src, comp)]
     if src == None and comp != None:
+        if path == '':
+            return [_added(path, comp)]
         return [_updated(path, src, comp)]
     if src == None and comp == None:
         return []
@@ -73,4 +80,12 @@ def diff(src, comp, **kw):
     if src != comp:
         return [_updated(path, src, comp)]
     return []
+
+def apply(src, diff):
+    pass
+    
+    
+    
+    
+    
     
