@@ -1,5 +1,6 @@
 import logging
 import json
+from pip._internal.cli.cmdoptions import src
 
 logger = logging.getLogger(__name__)
 
@@ -8,20 +9,46 @@ def _added(path, new_value):
     return {
         'path': path,
         'new_value': new_value
-    }    
+    }
+    
+def add(path, new_value):
+    return _added(path, new_value)
+
+def _is_add(d):
+    return 'new_value' in d and 'old_value' not in d
         
 def _removed(path, old_value):
     return {
         'path': path,
         'old_value': old_value
-    }    
+    }
+    
+def remove(path, old_value):
+    return _removed(path, old_value)  
+
+def _is_remove(d):
+    return 'old_value' in d and 'new_value' not in d
+        
         
 def _updated(path, old_value, new_value):
     return {
         'path': path,
         'new_value': new_value,
         'old_value': old_value
-    }  
+    }
+    
+def update(path, old_value, new_value):
+    return _updated(path, old_value, new_value)
+
+def _is_update(d):
+    return 'new_value' in d and 'old_value' in d
+
+def _new_value(d):
+    return d.get('new_value', None)
+        
+def _old_value(d):
+    return d.get('old_value', None)
+        
     
 def _dict_diff(path, src, comp):
     path = path+'.' if len(path) > 0 else path
@@ -81,8 +108,70 @@ def diff(src, comp, **kw):
         return [_updated(path, src, comp)]
     return []
 
+def _split_path(path):
+    if path == None:
+        return path
+    if path == '':
+        return ['']
+    if '.' not in path and '[' not in path:
+        return [path]
+    paths = []
+    item = ''
+    for c in path:
+        if c == '.':
+            if item != '':
+                paths.append(item)
+            item = ''
+            continue
+        if c == '[':
+            if item != '':
+                paths.append(item)
+            item = '['
+            continue
+        item = item+c
+    if item != '':
+        paths.append(item)
+    return paths
+        
+
+def _apply_d(src, d):
+    path = d['path']
+    if path == '':
+        return _new_value(d)
+    hold = src
+    paths = _split_path(path)
+    if len(paths) > 1:
+        for item in paths[:-1]:
+            if item[0] == '[':
+                hold = hold[int(item[1:-1])]
+            else:
+                hold = hold[item]
+    item = paths[-1]
+    if _is_add(d):
+        if item[0] == '[':
+            hold.insert(int(item[1:-1]), _new_value(d))
+        else:
+            hold[item] = _new_value(d)
+    elif _is_remove(d):
+        if item[0] == '[':
+            hold.pop(int(item[1:-1]))
+        else:
+            del hold[item]
+    elif _is_update(d):
+        if item[0] == '[':
+            hold[int(item[1:-1])] = _new_value(d)
+        else:
+            hold[item] = _new_value(d)
+    else:
+        raise Exception('This should not happen!')
+    return src         
+
 def apply(src, diff):
-    pass
+    resp = src.copy()
+    for d in diff:
+        resp = _apply_d(resp, d)
+    return resp
+        
     
     
     
